@@ -6,7 +6,7 @@ import { auth } from "@clerk/nextjs";
 
 export async function POST(req: Request) {
   try {
-    const { success, data, error } = createNoteSchema.safeParse(await req.json());
+    const { success, data, error } = await req.json();
 
     if (!success) return Response.json({ error: "Invalid input" }, { status: 400 });
 
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const { success, data, error } = updateNoteSchema.safeParse(await req.json());
+    const { success, data, error } = await req.json();
 
     if (!success) return Response.json({ error: "Invalid input" }, { status: 400 });
 
@@ -66,7 +66,7 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const { success, data, error } = deleteNoteSchema.safeParse(await req.json());
+    const { success, data, error } = await req.json();
 
     if (!success) return Response.json({ error: "Invalid input" }, { status: 400 });
 
