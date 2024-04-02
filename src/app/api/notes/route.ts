@@ -1,26 +1,50 @@
 import { notesIndex } from "@/lib/db/pinecone";
 import prisma from "@/lib/db/prisma";
 import { getEmbedding } from "@/lib/openai";
-import { createNoteSchema, deleteNoteSchema, updateNoteSchema } from "@/lib/validation/note";
+import {
+  createNoteSchema,
+  deleteNoteSchema,
+  updateNoteSchema,
+} from "@/lib/validation/note";
 import { auth } from "@clerk/nextjs";
 
 export async function POST(req: Request) {
   try {
-    const { success, data, error } = await req.json();
+    const body = await req.json();
 
-    if (!success) return Response.json({ error: "Invalid input" }, { status: 400 });
+    const parseResult = createNoteSchema.safeParse(body);
 
-    const { title, content } = data;
+    if (!parseResult.success) {
+      console.error(parseResult.error);
+      return Response.json({ error: "Invalid input" }, { status: 400 });
+    }
+
+    const { title, content } = parseResult.data;
+
     const { userId } = auth();
 
-    if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (!userId) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const embedding = await getEmbeddingForNote(title, content);
 
     const note = await prisma.$transaction(async (tx) => {
-      const note = await tx.note.create({ data: { title, content, userId } });
+      const note = await tx.note.create({
+        data: {
+          title,
+          content,
+          userId,
+        },
+      });
 
-      await notesIndex.upsert([{ id: note.id, values: embedding, metadata: { userId } }]);
+      await notesIndex.upsert([
+        {
+          id: note.id,
+          values: embedding,
+          metadata: { userId },
+        },
+      ]);
 
       return note;
     });
@@ -34,25 +58,47 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const { success, data, error } = await req.json();
+    const body = await req.json();
 
-    if (!success) return Response.json({ error: "Invalid input" }, { status: 400 });
+    const parseResult = updateNoteSchema.safeParse(body);
 
-    const { id, title, content } = data;
+    if (!parseResult.success) {
+      console.error(parseResult.error);
+      return Response.json({ error: "Invalid input" }, { status: 400 });
+    }
+
+    const { id, title, content } = parseResult.data;
+
     const note = await prisma.note.findUnique({ where: { id } });
 
-    if (!note) return Response.json({ error: "Note not found" }, { status: 404 });
+    if (!note) {
+      return Response.json({ error: "Note not found" }, { status: 404 });
+    }
 
     const { userId } = auth();
 
-    if (!userId || userId !== note.userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (!userId || userId !== note.userId) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const embedding = await getEmbeddingForNote(title, content);
 
     const updatedNote = await prisma.$transaction(async (tx) => {
-      const updatedNote = await tx.note.update({ where: { id }, data: { title, content } });
+      const updatedNote = await tx.note.update({
+        where: { id },
+        data: {
+          title,
+          content,
+        },
+      });
 
-      await notesIndex.upsert([{ id, values: embedding, metadata: { userId } }]);
+      await notesIndex.upsert([
+        {
+          id,
+          values: embedding,
+          metadata: { userId },
+        },
+      ]);
 
       return updatedNote;
     });
@@ -66,18 +112,28 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const { success, data, error } = await req.json();
+    const body = await req.json();
 
-    if (!success) return Response.json({ error: "Invalid input" }, { status: 400 });
+    const parseResult = deleteNoteSchema.safeParse(body);
 
-    const { id } = data;
+    if (!parseResult.success) {
+      console.error(parseResult.error);
+      return Response.json({ error: "Invalid input" }, { status: 400 });
+    }
+
+    const { id } = parseResult.data;
+
     const note = await prisma.note.findUnique({ where: { id } });
 
-    if (!note) return Response.json({ error: "Note not found" }, { status: 404 });
+    if (!note) {
+      return Response.json({ error: "Note not found" }, { status: 404 });
+    }
 
     const { userId } = auth();
 
-    if (!userId || userId !== note.userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (!userId || userId !== note.userId) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.note.delete({ where: { id } });
